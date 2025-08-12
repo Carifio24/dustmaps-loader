@@ -14,7 +14,7 @@ from glue.core import Data
 from glue.core.data_factories.fits import fits_reader
 
 from astropy.io.fits import HDUList, PrimaryHDU, writeto
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import SkyCoord, SkyOffsetFrame
 from astropy.table import Table
 from astropy.wcs import WCS
 import astropy.units as u
@@ -111,45 +111,30 @@ class DustmapLoaderWidget(QDialog):
             try:
                 l_center = float(self.l_input.text())
                 b_center = float(self.b_input.text())
-                radius = float(self.r_input.text())
+                r = float(self.r_input.text())
             except ValueError:
                 QMessageBox.critical(self, "Input Error", "Please enter valid numbers for l, b, and radius.")
                 return
 
-            # Parameters
-            radius_deg = 5.0  # desired radius in degrees
-            reso_arcmin = 1.0  # pixel resolution in arcminutes
+            center = SkyCoord(l=l_center * u.deg, b=b_center * u.deg, frame='galactic')
+            radius = r * u.deg
+            npts = 1000
             
-            # Convert radius to arcminutes
-            radius_arcmin = radius_deg * 60
+            # Offsets are in degrees here
+            lon_offsets = np.linspace(-radius, radius, npts)
+            lat_offsets = np.linspace(-radius, radius, npts)
+            lon_grid, lat_grid = np.meshgrid(lon_offsets, lat_offsets)
             
-            # Image size in pixels (diameter of the field of view)
-            diameter_pix = int(np.ceil(2 * radius_arcmin / reso_arcmin))
-
-            xsize = ysize = diameter_pix
-            reso_arcmin = (radius * 60 * 2) / xsize
-            proj = GnomonicProj(rot=(l_center, b_center), xsize=xsize, ysize=ysize, reso=reso_arcmin, coord='G')
-            print(proj.get_extent())
-
-            # WCS reference values
-            wcs = WCS(naxis=2)
-            wcs.wcs.ctype = ['RA---TAN', 'DEC--TAN']  # Gnomonic projection is 'TAN'
-            wcs.wcs.crpix = [xsize / 2, ysize / 2]    # center of the image
-            wcs.wcs.cdelt = np.array([-reso_arcmin / 60.0, reso_arcmin / 60.0])  # degrees per pixel
-            wcs.wcs.crval = (l_center, b_center) # central (lon, lat) in degrees
-            wcs.wcs.cunit = ['deg', 'deg']
+            offset_frame = SkyOffsetFrame(origin=center)
             
-            # Finalize WCS
-            wcs.array_shape = (ysize, xsize)
-
-            xpix, ypix = np.meshgrid(np.arange(xsize), np.arange(ysize))
-            vec = proj.xy2vec(xpix.flatten(), ypix.flatten())
-            print([len(w) for w in vec])
-            x = np.array(vec[0]) * u.pc
-            y = np.array(vec[1]) * u.pc
-            z = np.array(vec[2]) * u.pc
-            coords = SkyCoord(x=x, y=y, z=z,
-                              representation_type='cartesian', frame='icrs')
+            grid_in_offset_frame = SkyCoord(
+                lon=lon_grid,
+                lat=lat_grid,
+                distance=center.distance,
+                frame=offset_frame
+            )
+            
+            coords = grid_in_offset_frame.transform_to('galactic')
 
             dustmap = QueryClass()
             ebv = dustmap(coords)
