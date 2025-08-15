@@ -55,7 +55,7 @@ MAPS = {
     'Bayestar (Web)': (dustmaps.bayestar.BayestarWebQuery, None, BaseOptions),
     'Planck': (dustmaps.planck.PlanckQuery, dustmaps.planck.fetch, Base3DOptions),
     'DECaPS': (dustmaps.decaps.DECaPSQueryLite, dustmaps.decaps.fetch, DECaPSRegionOptions),
-    'DECaPS (Mean)': (lambda: dustmaps.decaps.DECaPSQueryLite(mean_only=True), lambda: dustmaps.decaps.fetch(mean_only=True), DECaPSRegionOptions)
+    'DECaPS (Mean)': (lambda: dustmaps.decaps.DECaPSQueryLite(mean_only=True, contiguous=True), lambda: dustmaps.decaps.fetch(mean_only=True), DECaPSRegionOptions)
 }
 
 
@@ -171,19 +171,12 @@ class DustmapLoaderWidget(QDialog):
            QMessageBox.critical(self, "Input Error", "Please enter valid numbers for l, b, and radius.")
            return
 
-        if self._has_distance(options_cls):
-            d_min = self._input_number("min_distance")
-            d_max = self._input_number("max_distance")
-            if hasattr(options_cls, "distance_step"):
-                d_steps = round((d_max - d_min) / self._input_number("distance_step"))
-            else:
-                d_steps = 10
-            distances = np.linspace(d_min, d_max, d_steps) * u.pc
-            center = SkyCoord(l=l_center * u.deg, b=b_center * u.deg, distance=distances, frame='galactic')
-        else:
-            center = SkyCoord(l=l_center * u.deg, b=b_center * u.deg, frame='galactic')
+
+        center = SkyCoord(l=l_center * u.deg, b=b_center * u.deg, distance=1*u.pc, frame='galactic')
         radius = r * u.deg
-        npts = 1000
+
+        is_3d = self._has_distance(options_cls)
+        npts = 50 if is_3d else 5000
         
         # Offsets are in degrees here
         lon_offsets = np.linspace(-radius, radius, npts)
@@ -191,13 +184,34 @@ class DustmapLoaderWidget(QDialog):
         lon_grid, lat_grid = np.meshgrid(lon_offsets, lat_offsets)
         
         offset_frame = SkyOffsetFrame(origin=center)
-        
-        grid_in_offset_frame = SkyCoord(
-            lon=lon_grid,
-            lat=lat_grid,
-            distance=center.distance,
-            frame=offset_frame
-        )
+
+        if is_3d:
+            d_min = self._input_number("min_distance")
+            d_max = self._input_number("max_distance")
+            if issubclass(options_cls, DECaPSRegionOptions):
+                d_steps = round((d_max - d_min) / self._input_number("distance_step"))
+            else:
+                d_steps = 10
+            distances = np.linspace(d_min, d_max, d_steps) * u.pc
+
+            lon3d, lat3d, dist3d = np.meshgrid(
+                lon_grid,
+                lat_grid,
+                distances,
+            )
+            grid_in_offset_frame = SkyCoord(
+                lon=lon3d,
+                lat=lat3d,
+                distance=dist3d,
+                frame=offset_frame,
+            )
+        else:
+            grid_in_offset_frame = SkyCoord(
+                lon=lon_grid,
+                lat=lat_grid,
+                distance=center.distance,
+                frame=offset_frame
+            )
         
         return grid_in_offset_frame.transform_to('galactic')
 
@@ -212,7 +226,7 @@ class DustmapLoaderWidget(QDialog):
             coords = self._input_coords(options_cls)
             print(coords)
             dustmap = QueryClass()
-            ebv = dustmap(coords, mode="mean")
+            ebv = dustmap(coords)
             print(ebv)
             self.data = [Data(label=map_name, values=ebv)]
             self.close()
