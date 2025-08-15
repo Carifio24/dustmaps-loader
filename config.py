@@ -54,9 +54,12 @@ class DustmapLoaderWidget(QDialog):
         # Region controls
         layout.addWidget(QLabel("Center (l, b in degrees) and Radius (deg):"))
         region_layout = QHBoxLayout()
-        self.l_input = QLineEdit(); self.l_input.setPlaceholderText("l")
-        self.b_input = QLineEdit(); self.b_input.setPlaceholderText("b")
-        self.r_input = QLineEdit(); self.r_input.setPlaceholderText("radius")
+        self.l_input = QLineEdit()
+        self.l_input.setPlaceholderText("l")
+        self.b_input = QLineEdit()
+        self.b_input.setPlaceholderText("b")
+        self.r_input = QLineEdit()
+        self.r_input.setPlaceholderText("radius")
         for w in [self.l_input, self.b_input, self.r_input]:
             region_layout.addWidget(w)
         layout.addLayout(region_layout)
@@ -95,8 +98,10 @@ class DustmapLoaderWidget(QDialog):
             self.options_layout.addRow("Step:", self.res_input)
 
     def add_distance_range_fields(self):
-        self.dmin_input = QLineEdit(); self.dmin_input.setPlaceholderText("e.g. 100")
-        self.dmax_input = QLineEdit(); self.dmax_input.setPlaceholderText("e.g. 5000")
+        self.dmin_input = QLineEdit()
+        self.dmin_input.setPlaceholderText("e.g. 100")
+        self.dmax_input = QLineEdit()
+        self.dmax_input.setPlaceholderText("e.g. 5000")
         self.options_layout.addRow("Min Distance (pc):", self.dmin_input)
         self.options_layout.addRow("Max Distance (pc):", self.dmax_input)
 
