@@ -1,6 +1,4 @@
 from dataclasses import dataclass, field, fields
-from importlib.metadata import metadata
-from io import BytesIO
 import os
 import sys
 import traceback
@@ -14,21 +12,20 @@ import dustmaps.decaps
 
 from glue.config import importer
 from glue.core import Data
-from glue.core.data_factories.fits import fits_reader
 
-from astropy.io.fits import HDUList, PrimaryHDU, writeto
 from astropy.coordinates import SkyCoord, SkyOffsetFrame
-from astropy.table import Table
-from astropy.wcs import WCS
 import astropy.units as u
-from healpy.projector import GnomonicProj
 import numpy as np
 from qtpy.QtWidgets import (
-    QApplication, QWidget, QFormLayout, QGroupBox, QHBoxLayout, QVBoxLayout, QLabel,
-    QLineEdit, QPushButton, QMessageBox, QComboBox, QDialog
+    QApplication, QFormLayout, QGroupBox, QHBoxLayout, QVBoxLayout, QLabel,
+    QLineEdit, QPushButton, QMessageBox, QComboBox, QDialog, QFileDialog
 )
 
 config["data_dir"] = "/media/jon/Seagate Backup Plus Drive1/dev/glue/data"
+
+
+# TODO: I don't feel that the dataclass model is really correct as we never instantiate the classes
+# But it's also not really a problem at the moment
 
 
 @dataclass
@@ -98,8 +95,26 @@ class DustmapLoaderWidget(QDialog):
             widgets[field.name] = self._widgets_for_field(field)
         return widgets
 
+    def _select_dir(self):
+        directory = QFileDialog.getExistingDirectory(
+                self,
+                "Select Directory",
+                "",
+                QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks)
+        if directory:
+            config["data_dir"] = directory
+            self.dir_button.setText(directory)
+
     def setup_ui(self):
         layout = QVBoxLayout()
+
+        dir_layout = QHBoxLayout()
+        self.dir_label = QLabel("Select directory")
+        self.dir_button = QPushButton(config["data_dir"])
+        dir_layout.addWidget(self.dir_label)
+        dir_layout.addWidget(self.dir_button)
+        self.dir_button.clicked.connect(self._select_dir)
+        layout.addLayout(dir_layout)
 
         # Map selector
         self.map_selector = QComboBox()
