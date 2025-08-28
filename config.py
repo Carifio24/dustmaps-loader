@@ -12,6 +12,7 @@ import dustmaps.decaps
 
 from glue.config import importer
 from glue.core import Data
+from glue_qt.utils.threading import Worker
 
 from astropy.coordinates import SkyCoord, SkyOffsetFrame
 import astropy.units as u
@@ -22,6 +23,41 @@ from qtpy.QtWidgets import (
 )
 
 config["data_dir"] = "/media/jon/Seagate Backup Plus Drive1/dev/glue/data"
+
+from qtpy.QtCore import Qt, QTimer
+from qtpy.QtWidgets import QDialog, QLabel, QVBoxLayout
+
+
+class MessageDialog(QDialog):
+
+    max_dots = 3
+
+    def __init__(self, message, parent=None):
+        super().__init__(parent=parent, flags=Qt.FramelessWindowHint)
+
+        self.label = QLabel()
+        self.message = message
+        self.label.setText(message)
+        self.layout = QVBoxLayout()
+        self.layout.addWidget(self.label)
+        self.setLayout(self.layout)
+
+        ending_spaces = " " * self.max_dots
+        if not self.label.text().endswith(ending_spaces):
+            self.label.setText(self.label.text() + ending_spaces)
+        self.n_dots = 0
+        self.timer = QTimer()
+        self.timer.timeout.connect(self._on_timer_update)
+        self.timer.start(750)
+
+    def _on_timer_update(self):
+        self.n_dots = (self.n_dots + 1) % (self.max_dots + 1)
+        text = self.message + "." * self.n_dots
+        self.label.setText(text)
+
+    def close(self):
+        super().close()
+        self.timer.stop()
 
 
 # TODO: I don't feel that the dataclass model is really correct as we never instantiate the classes
@@ -147,7 +183,6 @@ class DustmapLoaderWidget(QDialog):
         self.options_group.setLayout(self.options_layout)
         layout.addWidget(self.options_group)
 
-        # Dummy button
         self.import_btn = QPushButton("Import")
         self.import_btn.clicked.connect(self.import_data)
         layout.addWidget(self.import_btn)
@@ -186,7 +221,6 @@ class DustmapLoaderWidget(QDialog):
            QMessageBox.critical(self, "Input Error", "Please enter valid numbers for l, b, and radius.")
            return
 
-
         center = SkyCoord(l=l_center * u.deg, b=b_center * u.deg, distance=1*u.pc, frame='galactic')
         radius = r * u.deg
 
@@ -194,9 +228,8 @@ class DustmapLoaderWidget(QDialog):
         npts = 50 if is_3d else 5000
         
         # Offsets are in degrees here
-        lon_offsets = np.linspace(-radius, radius, npts)
-        lat_offsets = np.linspace(-radius, radius, npts)
-        lon_grid, lat_grid = np.meshgrid(lon_offsets, lat_offsets)
+        offsets = np.linspace(-radius, radius, npts)
+        lon_grid, lat_grid = np.meshgrid(offsets, offsets)
         
         offset_frame = SkyOffsetFrame(origin=center)
 
@@ -207,6 +240,9 @@ class DustmapLoaderWidget(QDialog):
                 d_steps = round((d_max - d_min) / self._input_number("distance_step"))
             else:
                 d_steps = 10
+
+            # TODO: Question for astronomy folks - would some sort of logarithmic
+            # stepping be better here?
             distances = np.linspace(d_min, d_max, d_steps) * u.pc
 
             lon3d, lat3d, dist3d = np.meshgrid(
@@ -220,6 +256,7 @@ class DustmapLoaderWidget(QDialog):
                 distance=dist3d,
                 frame=offset_frame,
             )
+
         else:
             grid_in_offset_frame = SkyCoord(
                 lon=lon_grid,
@@ -230,25 +267,30 @@ class DustmapLoaderWidget(QDialog):
         
         return grid_in_offset_frame.transform_to('galactic')
 
+    def _fetch_data(self):
+        map_name = self.map_selector.currentText()
+        QueryClass, fetch_map, options_cls = MAPS[map_name]
+
+        if (fetch_map is not None) and not os.path.exists(os.path.join(config['data_dir'], map_name.lower())):
+            fetch_map()
+
+        coords = self._input_coords(options_cls)
+        dustmap = QueryClass()
+        ebv = dustmap(coords)
+        self.data = [Data(label=map_name, values=ebv)]
+
     def import_data(self):
-        try:
-            map_name = self.map_selector.currentText()
-            QueryClass, fetch_map, options_cls = MAPS[map_name]
+        worker = Worker(self._fetch_data)
+        dialog = MessageDialog("Fetching data")
 
-            if (fetch_map is not None) and not os.path.exists(os.path.join(config['data_dir'], map_name.lower())):
-                fetch_map()
-
-            coords = self._input_coords(options_cls)
-            print(coords)
-            dustmap = QueryClass()
-            ebv = dustmap(coords)
-            print(ebv)
-            self.data = [Data(label=map_name, values=ebv)]
+        def finish():
+            dialog.close()
             self.close()
 
-        except Exception as e:
-            QMessageBox.critical(self, "Error", str(e))
-            traceback.print_exc()
+        worker.result.connect(finish)
+        worker.error.connect(dialog.close)
+        worker.start()
+        dialog.exec_()
 
 
 @importer("Import dustmaps data")
