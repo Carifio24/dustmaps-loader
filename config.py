@@ -22,7 +22,7 @@ from qtpy.QtWidgets import (
     QLineEdit, QPushButton, QMessageBox, QComboBox, QDialog, QFileDialog
 )
 
-config["data_dir"] = "/media/jon/Seagate Backup Plus Drive1/dev/glue/data"
+config["data_dir"] = os.getcwd()  # Good enough for now
 
 from qtpy.QtCore import Qt, QTimer
 from qtpy.QtWidgets import QDialog, QLabel, QVBoxLayout
