@@ -1,8 +1,6 @@
 from dataclasses import dataclass, field, fields
 import os
 import sys
-import traceback
-from PyQt5.QtGui import QDoubleValidator, QFont, QIntValidator
 
 from dustmaps.config import config
 import dustmaps.sfd
@@ -17,6 +15,8 @@ from glue_qt.utils.threading import Worker
 from astropy.coordinates import SkyCoord, SkyOffsetFrame
 import astropy.units as u
 import numpy as np
+
+from qtpy.QtGui import QDoubleValidator, QFont, QIntValidator
 from qtpy.QtWidgets import (
     QApplication, QFormLayout, QGroupBox, QHBoxLayout, QVBoxLayout, QLabel,
     QLineEdit, QPushButton, QMessageBox, QComboBox, QDialog, QFileDialog
