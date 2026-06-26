@@ -83,10 +83,10 @@ class DECaPSRegionOptions(Base3DOptions):
 
 
 MAPS = {
-    'SFD': (dustmaps.sfd.SFDQuery, dustmaps.sfd.fetch, Base3DOptions),
+    'SFD': (dustmaps.sfd.SFDQuery, dustmaps.sfd.fetch, BaseOptions),
+    'Planck': (dustmaps.planck.PlanckQuery, dustmaps.planck.fetch, BaseOptions),
     'Bayestar': (dustmaps.bayestar.BayestarQuery, dustmaps.bayestar.fetch, Base3DOptions),
     'Bayestar (Web)': (dustmaps.bayestar.BayestarWebQuery, None, Base3DOptions),
-    'Planck': (dustmaps.planck.PlanckQuery, dustmaps.planck.fetch, BaseOptions),
     'DECaPS': (dustmaps.decaps.DECaPSQueryLite, dustmaps.decaps.fetch, DECaPSRegionOptions),
     'DECaPS (Mean)': (lambda: dustmaps.decaps.DECaPSQueryLite(mean_only=True, contiguous=True), lambda: dustmaps.decaps.fetch(mean_only=True), DECaPSRegionOptions)
 }
